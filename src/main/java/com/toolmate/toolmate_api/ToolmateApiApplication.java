@@ -6,8 +6,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @SpringBootApplication
 public class ToolmateApiApplication {
 
-	public static void main(String[] args) {
-		SpringApplication.run(ToolmateApiApplication.class, args);
-	}
-
+    public static void main(String[] args) {
+        SpringApplication.run(ToolmateApiApplication.class, args);
+    }
 }
