@@ -19,8 +19,8 @@ public class SwaggerConfig {
                         .version("1.0")
                         .description("Neighbor Tool Sharing Platform API Documentation")
                         .contact(new Contact()
-                                .name("Your Name")
-                                .email("your.email@example.com")))
+                                .name("Thinuka Perera")
+                                .email("thinukapereraa@gmail.com")))
                 .components(new Components()
                         .addSecuritySchemes("bearerAuth",
                                 new SecurityScheme()
