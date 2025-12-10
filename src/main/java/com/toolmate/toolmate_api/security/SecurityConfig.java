@@ -42,9 +42,10 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable()) // Disable CSRF because we use JWT
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
-                                "/api/auth/**",      // Public endpoints for login/register
-                                "/swagger-ui/**",    // Swagger documentation
-                                "/v3/api-docs/**"
+                                "/api/auth/**",
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**",
+                                "/api-docs/**"
                         ).permitAll()
                         .anyRequest().authenticated() // All other requests need authentication
                 )
