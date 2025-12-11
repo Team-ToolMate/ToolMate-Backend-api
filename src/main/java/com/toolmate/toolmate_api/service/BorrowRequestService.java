@@ -1,6 +1,5 @@
 package com.toolmate.toolmate_api.service;
 
-
 import com.toolmate.toolmate_api.dto.request.BorrowRequestRequest;
 import com.toolmate.toolmate_api.dto.response.BorrowRequestResponse;
 import com.toolmate.toolmate_api.dto.response.OwnerDTO;
@@ -27,7 +26,9 @@ public class BorrowRequestService {
     private final BorrowRequestRepository borrowRequestRepository;
     private final ToolRepository toolRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
+    @Transactional
     public BorrowRequestResponse createBorrowRequest(BorrowRequestRequest request, String userEmail) {
         User borrower = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
@@ -52,6 +53,16 @@ public class BorrowRequestService {
         borrowRequest.setStatus(BorrowRequestStatus.PENDING);
 
         BorrowRequest savedRequest = borrowRequestRepository.save(borrowRequest);
+
+        // Send notification to tool owner
+        notificationService.createNotification(
+                tool.getOwner(),
+                "New Borrow Request",
+                borrower.getFullName() + " wants to borrow your " + tool.getName(),
+                "REQUEST_RECEIVED",
+                savedRequest.getId()
+        );
+
         return convertToResponse(savedRequest);
     }
 
@@ -85,14 +96,53 @@ public class BorrowRequestService {
             throw new IllegalArgumentException("Only the tool owner can update the request status");
         }
 
-        borrowRequest.setStatus(BorrowRequestStatus.valueOf(status));
+        // Validate status
+        BorrowRequestStatus newStatus;
+        try {
+            newStatus = BorrowRequestStatus.valueOf(status.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid status: " + status);
+        }
 
-        if (status.equals("ACCEPTED")) {
+        borrowRequest.setStatus(newStatus);
+
+        // Update tool availability based on status
+        if (newStatus == BorrowRequestStatus.ACCEPTED) {
             borrowRequest.getTool().setIsAvailable(false);
             toolRepository.save(borrowRequest.getTool());
-        } else if (status.equals("COMPLETED") || status.equals("CANCELLED") || status.equals("REJECTED")) {
+
+            // Notify borrower that request is accepted
+            notificationService.createNotification(
+                    borrowRequest.getBorrower(),
+                    "Request Accepted",
+                    "Your request for " + borrowRequest.getTool().getName() + " has been accepted",
+                    "REQUEST_ACCEPTED",
+                    borrowRequest.getId()
+            );
+
+        } else if (newStatus == BorrowRequestStatus.COMPLETED ||
+                newStatus == BorrowRequestStatus.CANCELLED ||
+                newStatus == BorrowRequestStatus.REJECTED) {
             borrowRequest.getTool().setIsAvailable(true);
             toolRepository.save(borrowRequest.getTool());
+
+            if (newStatus == BorrowRequestStatus.COMPLETED) {
+                // Notify both to write reviews
+                notificationService.createNotification(
+                        borrowRequest.getBorrower(),
+                        "Review Reminder",
+                        "Please review your experience with " + borrowRequest.getTool().getOwner().getFullName(),
+                        "REVIEW_REMINDER",
+                        borrowRequest.getId()
+                );
+                notificationService.createNotification(
+                        borrowRequest.getTool().getOwner(),
+                        "Review Reminder",
+                        "Please review your experience with " + borrowRequest.getBorrower().getFullName(),
+                        "REVIEW_REMINDER",
+                        borrowRequest.getId()
+                );
+            }
         }
 
         BorrowRequest updatedRequest = borrowRequestRepository.save(borrowRequest);
