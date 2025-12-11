@@ -112,6 +112,7 @@ public class BorrowRequestService {
                 tool.getImageUrls(),
                 tool.getIsAvailable(),
                 tool.getRentalFee(),
+                tool.getRateType(),
                 tool.getIsFullyCharged(),
                 0.0,
                 tool.getRating(),

@@ -18,6 +18,7 @@ public class ToolResponse {
     private List<String> imageUrls;
     private Boolean isAvailable;
     private Double rentalFee;
+    private String rateType;
     private Boolean isFullyCharged;
     private Double distance;
     private Double rating;

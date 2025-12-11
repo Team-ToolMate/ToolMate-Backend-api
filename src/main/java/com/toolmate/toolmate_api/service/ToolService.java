@@ -31,6 +31,7 @@ public class ToolService {
         tool.setCondition(request.getCondition());
         tool.setImageUrls(request.getImageUrls());
         tool.setRentalFee(request.getRentalFee());
+        tool.setRateType(request.getRateType());
         tool.setIsFullyCharged(request.getIsFullyCharged());
         tool.setOwner(user);
 
@@ -152,6 +153,7 @@ public class ToolService {
                 tool.getImageUrls(),
                 tool.getIsAvailable(),
                 tool.getRentalFee(),
+                tool.getRateType(),
                 tool.getIsFullyCharged(),
                 distance,
                 tool.getRating(),

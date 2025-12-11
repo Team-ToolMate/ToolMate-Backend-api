@@ -46,6 +46,9 @@ public class Tool {
     private Boolean isFullyCharged = true;
 
     @Column(nullable = false)
+    private String rateType = "DAILY";
+
+    @Column(nullable = false)
     private Double rating = 0.0;
 
     @Column(nullable = false)

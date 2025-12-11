@@ -11,5 +11,6 @@ public class ToolRequest {
     private String condition;
     private List<String> imageUrls;
     private Double rentalFee;
+    private String rateType;
     private Boolean isFullyCharged;
 }
