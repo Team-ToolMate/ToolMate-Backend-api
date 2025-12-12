@@ -59,4 +59,21 @@ public class BorrowRequest {
     public void preUpdate() {
         this.updatedAt = LocalDateTime.now();
     }
+
+    //Map with Status History
+
+    @OneToMany(mappedBy = "borrowRequest", cascade = CascadeType.ALL)
+    private List<StatusHistory> statusHistory = new ArrayList<>();
+
+    // Add collected/returned timestamps
+    @Column(nullable = true)
+    private LocalDateTime collectedAt;
+
+    @Column(nullable = true)
+    private LocalDateTime returnedAt;
+
+    @Column(nullable = true)
+    private LocalDateTime completedAt;
+
+
 }
