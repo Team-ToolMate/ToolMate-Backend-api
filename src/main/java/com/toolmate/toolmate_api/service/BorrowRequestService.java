@@ -1,21 +1,19 @@
 package com.toolmate.toolmate_api.service;
 
+import com.toolmate.toolmate_api.dto.*;
 import com.toolmate.toolmate_api.dto.request.BorrowRequestRequest;
 import com.toolmate.toolmate_api.dto.response.BorrowRequestResponse;
+import com.toolmate.toolmate_api.dto.response.StatusHistoryDTO;
 import com.toolmate.toolmate_api.dto.response.OwnerDTO;
 import com.toolmate.toolmate_api.dto.response.ToolResponse;
 import com.toolmate.toolmate_api.dto.response.UserDTO;
-import com.toolmate.toolmate_api.entity.BorrowRequest;
-import com.toolmate.toolmate_api.entity.BorrowRequestStatus;
-import com.toolmate.toolmate_api.entity.Tool;
-import com.toolmate.toolmate_api.entity.User;
-import com.toolmate.toolmate_api.repository.BorrowRequestRepository;
-import com.toolmate.toolmate_api.repository.ToolRepository;
-import com.toolmate.toolmate_api.repository.UserRepository;
+import com.toolmate.toolmate_api.entity.*;
+import com.toolmate.toolmate_api.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -26,7 +24,11 @@ public class BorrowRequestService {
     private final BorrowRequestRepository borrowRequestRepository;
     private final ToolRepository toolRepository;
     private final UserRepository userRepository;
+    private final StatusHistoryRepository statusHistoryRepository;
     private final NotificationService notificationService;
+
+
+//     Create new borrow request (Status: PENDING)
 
     @Transactional
     public BorrowRequestResponse createBorrowRequest(BorrowRequestRequest request, String userEmail) {
@@ -54,7 +56,10 @@ public class BorrowRequestService {
 
         BorrowRequest savedRequest = borrowRequestRepository.save(borrowRequest);
 
-        // Send notification to tool owner
+        // Create status history entry
+        createStatusHistory(savedRequest, BorrowRequestStatus.PENDING, borrower, "Request created");
+
+        // Notify owner
         notificationService.createNotification(
                 tool.getOwner(),
                 "New Borrow Request",
@@ -64,6 +69,297 @@ public class BorrowRequestService {
         );
 
         return convertToResponse(savedRequest);
+    }
+
+
+//     Owner accepts request (Status: PENDING → ACCEPTED)
+
+    @Transactional
+    public BorrowRequestResponse acceptRequest(Long requestId, String userEmail) {
+        User owner = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        BorrowRequest borrowRequest = borrowRequestRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Borrow request not found"));
+
+        // Validate owner
+        if (!borrowRequest.getTool().getOwner().getId().equals(owner.getId())) {
+            throw new IllegalArgumentException("Only the tool owner can accept this request");
+        }
+
+        // Validate current status
+        if (borrowRequest.getStatus() != BorrowRequestStatus.PENDING) {
+            throw new IllegalArgumentException("Can only accept pending requests");
+        }
+
+        // Update status
+        borrowRequest.setStatus(BorrowRequestStatus.ACCEPTED);
+        borrowRequest.getTool().setIsAvailable(false);
+        toolRepository.save(borrowRequest.getTool());
+
+        BorrowRequest updated = borrowRequestRepository.save(borrowRequest);
+
+        // Create status history
+        createStatusHistory(updated, BorrowRequestStatus.ACCEPTED, owner, "Request accepted by owner");
+
+        // Notify borrower
+        notificationService.createNotification(
+                borrowRequest.getBorrower(),
+                "Request Accepted! ",
+                "Your request for " + borrowRequest.getTool().getName() + " has been accepted. Contact: " + owner.getPhoneNumber(),
+                "REQUEST_ACCEPTED",
+                updated.getId()
+        );
+
+        return convertToResponse(updated);
+    }
+
+
+//     Owner rejects request (Status: PENDING → REJECTED)
+
+    @Transactional
+    public BorrowRequestResponse rejectRequest(Long requestId, String userEmail, String reason) {
+        User owner = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        BorrowRequest borrowRequest = borrowRequestRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Borrow request not found"));
+
+        if (!borrowRequest.getTool().getOwner().getId().equals(owner.getId())) {
+            throw new IllegalArgumentException("Only the tool owner can reject this request");
+        }
+
+        if (borrowRequest.getStatus() != BorrowRequestStatus.PENDING) {
+            throw new IllegalArgumentException("Can only reject pending requests");
+        }
+
+        borrowRequest.setStatus(BorrowRequestStatus.REJECTED);
+        BorrowRequest updated = borrowRequestRepository.save(borrowRequest);
+
+        createStatusHistory(updated, BorrowRequestStatus.REJECTED, owner, reason);
+
+        notificationService.createNotification(
+                borrowRequest.getBorrower(),
+                "Request Declined",
+                "Your request for " + borrowRequest.getTool().getName() + " was declined",
+                "REQUEST_REJECTED",
+                updated.getId()
+        );
+
+        return convertToResponse(updated);
+    }
+
+
+//     Borrower confirms pickup (Status: ACCEPTED → COLLECTED)
+
+    @Transactional
+    public BorrowRequestResponse confirmCollected(Long requestId, String userEmail) {
+        User borrower = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        BorrowRequest borrowRequest = borrowRequestRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Borrow request not found"));
+
+        if (!borrowRequest.getBorrower().getId().equals(borrower.getId())) {
+            throw new IllegalArgumentException("Only the borrower can confirm collection");
+        }
+
+        if (borrowRequest.getStatus() != BorrowRequestStatus.ACCEPTED) {
+            throw new IllegalArgumentException("Can only collect accepted requests");
+        }
+
+        borrowRequest.setStatus(BorrowRequestStatus.COLLECTED);
+        borrowRequest.setCollectedAt(LocalDateTime.now());
+        BorrowRequest updated = borrowRequestRepository.save(borrowRequest);
+
+        createStatusHistory(updated, BorrowRequestStatus.COLLECTED, borrower, "Tool collected by borrower");
+
+        notificationService.createNotification(
+                borrowRequest.getTool().getOwner(),
+                "Tool Collected",
+                borrower.getFullName() + " has collected your " + borrowRequest.getTool().getName(),
+                "TOOL_COLLECTED",
+                updated.getId()
+        );
+
+        return convertToResponse(updated);
+    }
+
+
+//     Borrower confirms return (Status: COLLECTED → RETURNED)
+    @Transactional
+    public BorrowRequestResponse confirmReturned(Long requestId, String userEmail) {
+        User borrower = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        BorrowRequest borrowRequest = borrowRequestRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Borrow request not found"));
+
+        if (!borrowRequest.getBorrower().getId().equals(borrower.getId())) {
+            throw new IllegalArgumentException("Only the borrower can confirm return");
+        }
+
+        if (borrowRequest.getStatus() != BorrowRequestStatus.COLLECTED) {
+            throw new IllegalArgumentException("Can only return collected tools");
+        }
+
+        borrowRequest.setStatus(BorrowRequestStatus.RETURNED);
+        borrowRequest.setReturnedAt(LocalDateTime.now());
+        BorrowRequest updated = borrowRequestRepository.save(borrowRequest);
+
+        createStatusHistory(updated, BorrowRequestStatus.RETURNED, borrower, "Tool returned by borrower");
+
+        notificationService.createNotification(
+                borrowRequest.getTool().getOwner(),
+                "Tool Returned ",
+                borrower.getFullName() + " has returned your " + borrowRequest.getTool().getName() + ". Please confirm receipt.",
+                "TOOL_RETURNED",
+                updated.getId()
+        );
+
+        return convertToResponse(updated);
+    }
+
+
+//     Owner confirms receipt and completes transaction (Status: RETURNED → COMPLETED)
+
+    @Transactional
+    public BorrowRequestResponse confirmReceipt(Long requestId, String userEmail) {
+        User owner = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        BorrowRequest borrowRequest = borrowRequestRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Borrow request not found"));
+
+        if (!borrowRequest.getTool().getOwner().getId().equals(owner.getId())) {
+            throw new IllegalArgumentException("Only the tool owner can confirm receipt");
+        }
+
+        if (borrowRequest.getStatus() != BorrowRequestStatus.RETURNED) {
+            throw new IllegalArgumentException("Can only confirm receipt of returned tools");
+        }
+
+        borrowRequest.setStatus(BorrowRequestStatus.COMPLETED);
+        borrowRequest.setCompletedAt(LocalDateTime.now());
+        borrowRequest.getTool().setIsAvailable(true);
+        borrowRequest.getTool().setTotalBorrows(borrowRequest.getTool().getTotalBorrows() + 1);
+
+        toolRepository.save(borrowRequest.getTool());
+        BorrowRequest updated = borrowRequestRepository.save(borrowRequest);
+
+        createStatusHistory(updated, BorrowRequestStatus.COMPLETED, owner, "Transaction completed");
+
+        // Update user statistics
+        User borrower = borrowRequest.getBorrower();
+        borrower.setTotalBorrows(borrower.getTotalBorrows() + 1);
+        owner.setTotalLends(owner.getTotalLends() + 1);
+        userRepository.save(borrower);
+        userRepository.save(owner);
+
+        // Notify both to write reviews
+        notificationService.createNotification(
+                borrower,
+                "Transaction Complete! ",
+                "Please rate your experience with " + owner.getFullName(),
+                "REVIEW_REMINDER",
+                updated.getId()
+        );
+
+        notificationService.createNotification(
+                owner,
+                "Transaction Complete!",
+                "Please rate your experience with " + borrower.getFullName(),
+                "REVIEW_REMINDER",
+                updated.getId()
+        );
+
+        return convertToResponse(updated);
+    }
+
+
+//     Cancel request (Any status except COMPLETED → CANCELLED)
+
+    @Transactional
+    public BorrowRequestResponse cancelRequest(Long requestId, String userEmail, String reason) {
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        BorrowRequest borrowRequest = borrowRequestRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Borrow request not found"));
+
+        // Validate user is part of this request
+        if (!borrowRequest.getBorrower().getId().equals(user.getId()) &&
+                !borrowRequest.getTool().getOwner().getId().equals(user.getId())) {
+            throw new IllegalArgumentException("You cannot cancel this request");
+        }
+
+        if (borrowRequest.getStatus() == BorrowRequestStatus.COMPLETED) {
+            throw new IllegalArgumentException("Cannot cancel completed transactions");
+        }
+
+        borrowRequest.setStatus(BorrowRequestStatus.CANCELLED);
+
+        // Make tool available again
+        borrowRequest.getTool().setIsAvailable(true);
+        toolRepository.save(borrowRequest.getTool());
+
+        BorrowRequest updated = borrowRequestRepository.save(borrowRequest);
+
+        createStatusHistory(updated, BorrowRequestStatus.CANCELLED, user, reason);
+
+        // Notify the other party
+        User otherUser = borrowRequest.getBorrower().getId().equals(user.getId())
+                ? borrowRequest.getTool().getOwner()
+                : borrowRequest.getBorrower();
+
+        notificationService.createNotification(
+                otherUser,
+                "Request Cancelled",
+                user.getFullName() + " cancelled the request for " + borrowRequest.getTool().getName(),
+                "REQUEST_CANCELLED",
+                updated.getId()
+        );
+
+        return convertToResponse(updated);
+    }
+
+
+//     Get status timeline
+
+    public List<StatusHistoryDTO> getStatusTimeline(Long requestId, String userEmail) {
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        BorrowRequest borrowRequest = borrowRequestRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Borrow request not found"));
+
+        // Validate user is part of this request
+        if (!borrowRequest.getBorrower().getId().equals(user.getId()) &&
+                !borrowRequest.getTool().getOwner().getId().equals(user.getId())) {
+            throw new IllegalArgumentException("You cannot view this timeline");
+        }
+
+        List<StatusHistory> history = statusHistoryRepository.findByBorrowRequestOrderByChangedAtAsc(borrowRequest);
+
+        return history.stream()
+                .map(h -> new StatusHistoryDTO(
+                        h.getStatus().name(),
+                        h.getChangedBy().getFullName(),
+                        h.getNotes(),
+                        h.getChangedAt()
+                ))
+                .collect(Collectors.toList());
+    }
+
+    // Helper methods
+    private void createStatusHistory(BorrowRequest borrowRequest, BorrowRequestStatus status,
+                                     User changedBy, String notes) {
+        StatusHistory history = new StatusHistory();
+        history.setBorrowRequest(borrowRequest);
+        history.setStatus(status);
+        history.setChangedBy(changedBy);
+        history.setNotes(notes);
+        statusHistoryRepository.save(history);
     }
 
     public List<BorrowRequestResponse> getMyBorrowRequests(String userEmail) {
@@ -82,71 +378,6 @@ public class BorrowRequestService {
         return borrowRequestRepository.findByToolOwner(user).stream()
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
-    }
-
-    @Transactional
-    public BorrowRequestResponse updateRequestStatus(Long requestId, String status, String userEmail) {
-        User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
-
-        BorrowRequest borrowRequest = borrowRequestRepository.findById(requestId)
-                .orElseThrow(() -> new IllegalArgumentException("Borrow request not found"));
-
-        if (!borrowRequest.getTool().getOwner().getId().equals(user.getId())) {
-            throw new IllegalArgumentException("Only the tool owner can update the request status");
-        }
-
-        // Validate status
-        BorrowRequestStatus newStatus;
-        try {
-            newStatus = BorrowRequestStatus.valueOf(status.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Invalid status: " + status);
-        }
-
-        borrowRequest.setStatus(newStatus);
-
-        // Update tool availability based on status
-        if (newStatus == BorrowRequestStatus.ACCEPTED) {
-            borrowRequest.getTool().setIsAvailable(false);
-            toolRepository.save(borrowRequest.getTool());
-
-            // Notify borrower that request is accepted
-            notificationService.createNotification(
-                    borrowRequest.getBorrower(),
-                    "Request Accepted",
-                    "Your request for " + borrowRequest.getTool().getName() + " has been accepted",
-                    "REQUEST_ACCEPTED",
-                    borrowRequest.getId()
-            );
-
-        } else if (newStatus == BorrowRequestStatus.COMPLETED ||
-                newStatus == BorrowRequestStatus.CANCELLED ||
-                newStatus == BorrowRequestStatus.REJECTED) {
-            borrowRequest.getTool().setIsAvailable(true);
-            toolRepository.save(borrowRequest.getTool());
-
-            if (newStatus == BorrowRequestStatus.COMPLETED) {
-                // Notify both to write reviews
-                notificationService.createNotification(
-                        borrowRequest.getBorrower(),
-                        "Review Reminder",
-                        "Please review your experience with " + borrowRequest.getTool().getOwner().getFullName(),
-                        "REVIEW_REMINDER",
-                        borrowRequest.getId()
-                );
-                notificationService.createNotification(
-                        borrowRequest.getTool().getOwner(),
-                        "Review Reminder",
-                        "Please review your experience with " + borrowRequest.getBorrower().getFullName(),
-                        "REVIEW_REMINDER",
-                        borrowRequest.getId()
-                );
-            }
-        }
-
-        BorrowRequest updatedRequest = borrowRequestRepository.save(borrowRequest);
-        return convertToResponse(updatedRequest);
     }
 
     private BorrowRequestResponse convertToResponse(BorrowRequest borrowRequest) {
