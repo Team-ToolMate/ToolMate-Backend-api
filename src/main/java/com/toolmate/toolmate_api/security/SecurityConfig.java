@@ -39,21 +39,30 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(csrf -> csrf.disable()) // Disable CSRF because we use JWT
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(
-                                "/api/auth/**",
-                                "/swagger-ui/**",
-                                "/ws/**",
-                                "/v3/api-docs/**",
-                                "/api-docs/**"
-                        ).permitAll()
-                        .anyRequest().authenticated() // All other requests need authentication
-                )
+                // Disable CSRF for REST API and WebSocket
+                .csrf(csrf -> csrf.disable())
+
+                // Session is stateless (JWT)
                 .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS) // No sessions; JWT is stateless
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
-                // Add JWT filter before Spring Security's UsernamePasswordAuthenticationFilter
+
+                // Endpoint authorization
+                .authorizeHttpRequests(auth -> auth
+                        // Public endpoints
+                        .requestMatchers(
+                                "/api/auth/**",           // Login / signup
+                                "/swagger-ui/**",         // Swagger UI
+                                "/v3/api-docs/**",        // OpenAPI docs
+                                "/api-docs/**",           // OpenAPI docs
+                                "/ws/**"                  // WebSocket handshake
+                        ).permitAll()
+
+                        // All other endpoints require authentication
+                        .anyRequest().authenticated()
+                )
+
+                // Add JWT filter before UsernamePasswordAuthenticationFilter
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
