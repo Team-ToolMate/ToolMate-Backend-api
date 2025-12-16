@@ -6,6 +6,7 @@ import com.toolmate.toolmate_api.service.MessageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -25,7 +26,7 @@ public class MessageController {
     @PostMapping
     @Operation(summary = "Send a message")
     public ResponseEntity<MessageResponse> sendMessage(
-            @RequestBody MessageRequest request,
+            @Valid @RequestBody MessageRequest request,
             Authentication authentication) {
         return ResponseEntity.ok(messageService.sendMessage(request, authentication.getName()));
     }

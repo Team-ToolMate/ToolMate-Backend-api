@@ -7,6 +7,7 @@ import com.toolmate.toolmate_api.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -38,7 +39,7 @@ public class UserController {
     @PutMapping("/profile")
     @Operation(summary = "Update current user's profile")
     public ResponseEntity<UserDTO> updateProfile(
-            @RequestBody UpdateProfileRequest request,
+           @Valid @RequestBody UpdateProfileRequest request,
             Authentication authentication) {
         return ResponseEntity.ok(userService.updateProfile(request, authentication.getName()));
     }
@@ -46,7 +47,7 @@ public class UserController {
     @PutMapping("/change-password")
     @Operation(summary = "Change user password")
     public ResponseEntity<String> changePassword(
-            @RequestBody ChangePasswordRequest request,
+           @Valid @RequestBody ChangePasswordRequest request,
             Authentication authentication) {
         userService.changePassword(request, authentication.getName());
         return ResponseEntity.ok("Password changed successfully");

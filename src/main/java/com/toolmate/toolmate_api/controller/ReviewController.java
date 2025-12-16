@@ -6,6 +6,7 @@ import com.toolmate.toolmate_api.service.ReviewService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -25,7 +26,7 @@ public class ReviewController {
     @PostMapping
     @Operation(summary = "Create a review for a user")
     public ResponseEntity<ReviewResponse> createReview(
-            @RequestBody ReviewRequest request,
+            @Valid @RequestBody ReviewRequest request,
             Authentication authentication) {
         return ResponseEntity.ok(reviewService.createReview(request, authentication.getName()));
     }

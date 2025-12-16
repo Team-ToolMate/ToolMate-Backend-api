@@ -6,6 +6,7 @@ import com.toolmate.toolmate_api.service.ToolService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -25,7 +26,7 @@ public class ToolController {
     @PostMapping
     @Operation(summary = "Create a new tool listing")
     public ResponseEntity<ToolResponse> createTool(
-            @RequestBody ToolRequest request,
+            @Valid @RequestBody ToolRequest request,
             Authentication authentication) {
         return ResponseEntity.ok(toolService.createTool(request, authentication.getName()));
     }
@@ -56,7 +57,7 @@ public class ToolController {
     @Operation(summary = "Update tool information")
     public ResponseEntity<ToolResponse> updateTool(
             @PathVariable Long id,
-            @RequestBody ToolRequest request,
+            @Valid @RequestBody ToolRequest request,
             Authentication authentication) {
         return ResponseEntity.ok(toolService.updateTool(id, request, authentication.getName()));
     }

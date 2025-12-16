@@ -7,6 +7,7 @@ import com.toolmate.toolmate_api.service.BorrowRequestService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -26,7 +27,7 @@ public class BorrowRequestController {
     @PostMapping
     @Operation(summary = "Create new borrow request (Status: PENDING)")
     public ResponseEntity<BorrowRequestResponse> createBorrowRequest(
-            @RequestBody BorrowRequestRequest request,
+            @Valid @RequestBody BorrowRequestRequest request,
             Authentication authentication) {
         return ResponseEntity.ok(borrowRequestService.createBorrowRequest(request, authentication.getName()));
     }

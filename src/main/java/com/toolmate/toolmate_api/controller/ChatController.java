@@ -129,3 +129,70 @@ public class ChatController {
         );
     }
 }
+
+
+
+
+
+// ===================== For Normal Testing ==============================
+
+
+//package com.toolmate.toolmate_api.controller;
+//
+//import com.toolmate.toolmate_api.dto.response.ChatMessage;
+//import lombok.extern.slf4j.Slf4j;
+//import org.springframework.messaging.handler.annotation.MessageMapping;
+//import org.springframework.messaging.handler.annotation.Payload;
+//import org.springframework.messaging.simp.SimpMessagingTemplate;
+//import org.springframework.stereotype.Controller;
+//
+//import java.time.LocalDateTime;
+//
+//@Controller
+//@Slf4j
+//public class ChatController {
+//
+//    private final SimpMessagingTemplate messagingTemplate;
+//
+//    public ChatController(SimpMessagingTemplate messagingTemplate) {
+//        this.messagingTemplate = messagingTemplate;
+//    }
+//
+//    /**
+//     * Handle incoming chat messages
+//     * Client sends to: /app/chat.send
+//     * Server broadcasts to: /topic/borrow-request/{borrowRequestId}
+//     */
+//    @MessageMapping("/chat.send")
+//    public void sendMessage(@Payload ChatMessage chatMessage) {
+//        try {
+//            // Set timestamp
+//            chatMessage.setTimestamp(LocalDateTime.now());
+//
+//            // Log for server console
+//            log.info("Message from {} to borrowRequest {}: {}",
+//                    chatMessage.getSenderName(),
+//                    chatMessage.getBorrowRequestId(),
+//                    chatMessage.getContent());
+//
+//            // Send to all users subscribed to the room
+//            String destination = "/topic/borrow-request/" + chatMessage.getBorrowRequestId();
+//            messagingTemplate.convertAndSend(destination, chatMessage);
+//
+//        } catch (Exception e) {
+//            log.error("Error sending message: ", e);
+//        }
+//    }
+//
+//    /**
+//     * Optional: Handle typing indicator
+//     * Client sends to: /app/chat.typing
+//     */
+//    @MessageMapping("/chat.typing")
+//    public void typingIndicator(@Payload ChatMessage chatMessage) {
+//        String destination = "/topic/borrow-request/" + chatMessage.getBorrowRequestId() + "/typing";
+//        messagingTemplate.convertAndSend(destination, chatMessage);
+//        log.info("Typing indicator from {} in borrowRequest {}",
+//                chatMessage.getSenderName(), chatMessage.getBorrowRequestId());
+//    }
+//}
