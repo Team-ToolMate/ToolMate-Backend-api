@@ -24,7 +24,7 @@ jobs:
     - name: 📦 Build with Maven
       run: mvn clean package -DskipTests
     
-    - name: 📤 Upload JAR to DigitalOcean
+    - name: 📤 Upload JAR to temp directory
       uses: appleboy/scp-action@v0.1.7
       with:
         host: ${{ secrets.DROPLET_HOST }}
@@ -32,11 +32,11 @@ jobs:
         key: ${{ secrets.DROPLET_SSH_KEY }}
         port: ${{ secrets.DROPLET_PORT }}
         source: "target/toolmate-api-*.jar"
-        target: "/root/"
+        target: "/tmp/"
         strip_components: 1
         overwrite: true
     
-    - name: 🔄 Rename uploaded JAR
+    - name: 🔄 Move JAR to deployment location
       uses: appleboy/ssh-action@v1.0.3
       with:
         host: ${{ secrets.DROPLET_HOST }}
@@ -44,8 +44,9 @@ jobs:
         key: ${{ secrets.DROPLET_SSH_KEY }}
         port: ${{ secrets.DROPLET_PORT }}
         script: |
-          cd /root
-          mv toolmate-api-*.jar toolmate-new.jar 2>/dev/null || true
+          mv /tmp/toolmate-api-*.jar /root/toolmate-new.jar
+          echo "New JAR ready at /root/toolmate-new.jar"
+          ls -lh /root/toolmate-new.jar
     
     - name: 🚀 Execute deployment script
       uses: appleboy/ssh-action@v1.0.3
