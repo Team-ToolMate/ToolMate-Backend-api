@@ -1,6 +1,6 @@
 # ToolMate-Backend-api
 
-📁 Project Structure
+📁 Project-Structure
 
         toolmate-api/
               ├── src/main/java/com/toolmate/api/
