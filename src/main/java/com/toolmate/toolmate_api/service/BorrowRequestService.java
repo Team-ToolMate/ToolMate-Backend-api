@@ -27,8 +27,7 @@ public class BorrowRequestService {
     private final NotificationService notificationService;
 
 
-//     Create new borrow request (Status: PENDING)
-
+    // Create new borrow request (Status: PENDING)
     @Transactional
     public BorrowRequestResponse createBorrowRequest(BorrowRequestRequest request, String userEmail) {
         User borrower = userRepository.findByEmail(userEmail)
@@ -58,12 +57,11 @@ public class BorrowRequestService {
         // Create status history entry
         createStatusHistory(savedRequest, BorrowRequestStatus.PENDING, borrower, "Request created");
 
-        // Notify owner
-        notificationService.createNotification(
+        // ✅ SEND NOTIFICATION
+        notificationService.notifyRequestReceived(
                 tool.getOwner(),
-                "New Borrow Request",
-                borrower.getFullName() + " wants to borrow your " + tool.getName(),
-                "REQUEST_RECEIVED",
+                borrower.getFullName(),
+                tool.getName(),
                 savedRequest.getId()
         );
 
@@ -71,8 +69,7 @@ public class BorrowRequestService {
     }
 
 
-//     Owner accepts request (Status: PENDING → ACCEPTED)
-
+    // Owner accepts request (Status: PENDING → ACCEPTED)
     @Transactional
     public BorrowRequestResponse acceptRequest(Long requestId, String userEmail) {
         User owner = userRepository.findByEmail(userEmail)
@@ -101,21 +98,20 @@ public class BorrowRequestService {
         // Create status history
         createStatusHistory(updated, BorrowRequestStatus.ACCEPTED, owner, "Request accepted by owner");
 
-        // Notify borrower
-        notificationService.createNotification(
+        // ✅ SEND NOTIFICATION
+        notificationService.notifyRequestAccepted(
                 borrowRequest.getBorrower(),
-                "Request Accepted! ",
-                "Your request for " + borrowRequest.getTool().getName() + " has been accepted. Contact: " + owner.getPhoneNumber(),
-                "REQUEST_ACCEPTED",
-                updated.getId()
+                borrowRequest.getTool().getName(),
+                owner.getFullName(),
+                owner.getPhoneNumber(),
+                borrowRequest.getId()
         );
 
         return convertToResponse(updated);
     }
 
 
-//     Owner rejects request (Status: PENDING → REJECTED)
-
+    // Owner rejects request (Status: PENDING → REJECTED)
     @Transactional
     public BorrowRequestResponse rejectRequest(Long requestId, String userEmail, String reason) {
         User owner = userRepository.findByEmail(userEmail)
@@ -137,20 +133,19 @@ public class BorrowRequestService {
 
         createStatusHistory(updated, BorrowRequestStatus.REJECTED, owner, reason);
 
-        notificationService.createNotification(
+        // ✅ SEND NOTIFICATION
+        notificationService.notifyRequestRejected(
                 borrowRequest.getBorrower(),
-                "Request Declined",
-                "Your request for " + borrowRequest.getTool().getName() + " was declined",
-                "REQUEST_REJECTED",
-                updated.getId()
+                borrowRequest.getTool().getName(),
+                owner.getFullName(),
+                borrowRequest.getId()
         );
 
         return convertToResponse(updated);
     }
 
 
-//     Borrower confirms pickup (Status: ACCEPTED → COLLECTED)
-
+    // Borrower confirms pickup (Status: ACCEPTED → COLLECTED)
     @Transactional
     public BorrowRequestResponse confirmCollected(Long requestId, String userEmail) {
         User borrower = userRepository.findByEmail(userEmail)
@@ -173,19 +168,19 @@ public class BorrowRequestService {
 
         createStatusHistory(updated, BorrowRequestStatus.COLLECTED, borrower, "Tool collected by borrower");
 
-        notificationService.createNotification(
+        // ✅ SEND NOTIFICATION
+        notificationService.notifyToolCollected(
                 borrowRequest.getTool().getOwner(),
-                "Tool Collected",
-                borrower.getFullName() + " has collected your " + borrowRequest.getTool().getName(),
-                "TOOL_COLLECTED",
-                updated.getId()
+                borrower.getFullName(),
+                borrowRequest.getTool().getName(),
+                borrowRequest.getId()
         );
 
         return convertToResponse(updated);
     }
 
 
-//     Borrower confirms return (Status: COLLECTED → RETURNED)
+    // Borrower confirms return (Status: COLLECTED → RETURNED)
     @Transactional
     public BorrowRequestResponse confirmReturned(Long requestId, String userEmail) {
         User borrower = userRepository.findByEmail(userEmail)
@@ -208,20 +203,19 @@ public class BorrowRequestService {
 
         createStatusHistory(updated, BorrowRequestStatus.RETURNED, borrower, "Tool returned by borrower");
 
-        notificationService.createNotification(
+        // ✅ SEND NOTIFICATION
+        notificationService.notifyToolReturned(
                 borrowRequest.getTool().getOwner(),
-                "Tool Returned ",
-                borrower.getFullName() + " has returned your " + borrowRequest.getTool().getName() + ". Please confirm receipt.",
-                "TOOL_RETURNED",
-                updated.getId()
+                borrower.getFullName(),
+                borrowRequest.getTool().getName(),
+                borrowRequest.getId()
         );
 
         return convertToResponse(updated);
     }
 
 
-//     Owner confirms receipt and completes transaction (Status: RETURNED → COMPLETED)
-
+    // Owner confirms receipt and completes transaction (Status: RETURNED → COMPLETED)
     @Transactional
     public BorrowRequestResponse confirmReceipt(Long requestId, String userEmail) {
         User owner = userRepository.findByEmail(userEmail)
@@ -255,29 +249,39 @@ public class BorrowRequestService {
         userRepository.save(borrower);
         userRepository.save(owner);
 
-        // Notify both to write reviews
-        notificationService.createNotification(
+        // ✅ SEND TRANSACTION COMPLETED NOTIFICATIONS TO BOTH PARTIES
+        notificationService.notifyTransactionCompleted(
                 borrower,
-                "Transaction Complete! ",
-                "Please rate your experience with " + owner.getFullName(),
-                "REVIEW_REMINDER",
-                updated.getId()
+                owner.getFullName(),
+                borrowRequest.getTool().getName(),
+                borrowRequest.getId()
         );
 
-        notificationService.createNotification(
+        notificationService.notifyTransactionCompleted(
                 owner,
-                "Transaction Complete!",
-                "Please rate your experience with " + borrower.getFullName(),
-                "REVIEW_REMINDER",
-                updated.getId()
+                borrower.getFullName(),
+                borrowRequest.getTool().getName(),
+                borrowRequest.getId()
+        );
+
+        // ✅ SEND REVIEW REMINDERS TO BOTH PARTIES
+        notificationService.notifyReviewReminder(
+                borrower,
+                owner.getFullName(),
+                borrowRequest.getId()
+        );
+
+        notificationService.notifyReviewReminder(
+                owner,
+                borrower.getFullName(),
+                borrowRequest.getId()
         );
 
         return convertToResponse(updated);
     }
 
 
-//     Cancel request (Any status except COMPLETED → CANCELLED)
-
+    // Cancel request (Any status except COMPLETED → CANCELLED)
     @Transactional
     public BorrowRequestResponse cancelRequest(Long requestId, String userEmail, String reason) {
         User user = userRepository.findByEmail(userEmail)
@@ -306,25 +310,23 @@ public class BorrowRequestService {
 
         createStatusHistory(updated, BorrowRequestStatus.CANCELLED, user, reason);
 
-        // Notify the other party
+        // ✅ SEND NOTIFICATION TO OTHER PARTY
         User otherUser = borrowRequest.getBorrower().getId().equals(user.getId())
                 ? borrowRequest.getTool().getOwner()
                 : borrowRequest.getBorrower();
 
-        notificationService.createNotification(
+        notificationService.notifyRequestCancelled(
                 otherUser,
-                "Request Cancelled",
-                user.getFullName() + " cancelled the request for " + borrowRequest.getTool().getName(),
-                "REQUEST_CANCELLED",
-                updated.getId()
+                user.getFullName(),
+                borrowRequest.getTool().getName(),
+                borrowRequest.getId()
         );
 
         return convertToResponse(updated);
     }
 
 
-//     Get status timeline
-
+    // Get status timeline
     public List<StatusHistoryDTO> getStatusTimeline(Long requestId, String userEmail) {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));

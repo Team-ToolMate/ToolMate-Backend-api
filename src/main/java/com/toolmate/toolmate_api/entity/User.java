@@ -55,6 +55,9 @@ public class User {
     @Column(nullable = false)
     private Boolean isActive = true;
 
+    @Column(nullable = true)
+    private String fcmToken; // Device token for push notifications
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 

@@ -68,6 +68,18 @@ public class UserController {
         return ResponseEntity.ok("Account deleted successfully");
     }
 
+    @PutMapping("/fcm-token")
+    @Operation(summary = "Update FCM device token for push notifications")
+    public ResponseEntity<String> updateFcmToken(
+            @RequestParam String token,
+            Authentication authentication) {
+        userService.updateFcmToken(token, authentication.getName());
+        return ResponseEntity.ok("FCM token updated successfully");
+    }
+
+
+
+
 //    @GetMapping("/all")
 //    @Operation(summary = "Get all users (for search/admin)")
 //    public ResponseEntity<List<UserDTO>> getAllUsers() {

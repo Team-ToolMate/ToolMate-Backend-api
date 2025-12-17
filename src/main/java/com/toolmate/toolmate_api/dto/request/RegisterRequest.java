@@ -11,7 +11,7 @@ public class RegisterRequest {
     private String fullName;
 
     @Min(value = 18, message = "You must be at least 18 years old")
-    @Max(value = 120, message = "Age must be realistic")
+    @Max(value = 100, message = "Age must be realistic")
     private Integer age;
 
     @NotBlank(message = "Email is required")
@@ -27,9 +27,8 @@ public class RegisterRequest {
     private String password;
 
     @Pattern(
-            regexp = "^\\+?[1-9]\\d{1,14}$",
-            message = "Phone number must be valid (E.164 format)"
-    )
+            regexp = "^(\\+94|0)?7\\d{8}$",
+            message = "Phone number must be a valid in Sri Lankan mobile number")
     private String phoneNumber;
 
     @NotNull(message = "Latitude is required")

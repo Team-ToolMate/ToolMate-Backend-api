@@ -129,6 +129,16 @@ public class UserService {
     }
 
 
+    @Transactional
+    public void updateFcmToken(String fcmToken, String userEmail) {
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        user.setFcmToken(fcmToken);
+        userRepository.save(user);
+    }
+
+
 //     Get all users (for admin or search purposes)
 
 //    public List<UserDTO> getAllUsers() {
